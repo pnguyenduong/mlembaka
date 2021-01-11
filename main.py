@@ -10,22 +10,6 @@ from server import uptime_monitor
 client = discord.Client()
 client = commands.Bot(command_prefix="mlem!")
 
-print("debug DB ")
-print(db.items())
-
-db["reminders"].append("fuck you")
-
-print('after added more words')
-print(db.items())
-print(db.items)
-
-# with open('stories.json') as json_file:
-#   dictionary = 
-
-
-if "responding" not in db.keys():
-  db["responding"] = True
-
 def get_quote():
   response = requests.get("https://zenquotes.io/api/random")
   json_data = json.loads(response.text)
@@ -35,6 +19,8 @@ def get_quote():
 # add reminder
 def update_reminder(reminder_message):
   if "reminders" in db.keys():
+    print("db keys: ", db.keys())
+    print("reminders: ", db["reminders"])
     reminders = db["reminders"]
     reminders.append(reminder_message)
     db["reminders"] = reminders
@@ -70,10 +56,15 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-  #if message.author == client.user:
-  #  return
   msg = message.content
+
+  if msg.lower() in db.keys() and len(db[msg]) > 0:
+    await message.channel.send(random.choice(db[msg]))
+    
+  print(msg)
   prefix = client.command_prefix
+  print('prefix: ', prefix)
+  
   # list of available commands 
   if msg.startswith(prefix + "help"):
     help_list = ["add_reminder","add_badword", "del_reminder", "del_badword", "reminders", "badwords", "responding"]
@@ -84,18 +75,25 @@ async def on_message(message):
     quote = get_quote()
     await message.channel.send(quote)
   if msg.lower().startswith("chom") or msg.lower().startswith("chôm"):
-    await message.channel.send(story["chom"])
-  
+    # await message.channel.send(story["chom"])
+    await message.channel.send(random.choice(db["chom"]))
+  _reminders_name = "reminders"
+
   # bot running with responding value = true 
+  print("reminders: ", db[_reminders_name])
   if db["responding"]:
-    options = []
+    reminders = []
     if "reminders" in db.keys():
-      options = options + db["reminders"]
-    bad_words = []
-    if "bad_words" in db.keys():
-      bad_words = bad_words + db["bad_words"]  
-    if any(word in msg.lower() for word in bad_words):
-      await message.channel.send(random.choice(options))
+      reminders = db[_reminders_name]
+    
+    if not db["reminders"]:
+      print('hello im in here')
+      reminders.append("shut da fuck up")
+      db[_reminders_name] = reminders
+      
+    print(db["reminders"])
+    if any(word in msg.lower() for word in db["bad_words"]):
+      await message.channel.send(random.choice(reminders))
 
   # create a new reminder message
   if msg.startswith(prefix + "add_reminder"):
@@ -111,7 +109,6 @@ async def on_message(message):
 
   # delete a reminder by index number
   if msg.startswith(prefix + "del_reminder"):
-    reminders = []
     if "reminders" in db.keys():
       index = int(msg.split("del_reminder")[1])
       delete_reminder(index)
@@ -120,7 +117,6 @@ async def on_message(message):
 
   # delete a bad word by index number
   if msg.startswith(prefix + "del_badword"):
-    bad_words = []
     if "bad_words" in db.keys():
       index = int(msg.split("del_badword")[1])
       delete_badword(index)
@@ -129,14 +125,12 @@ async def on_message(message):
 
   # get a list of reminders
   if msg.startswith(prefix + "reminders"):
-    reminders = []
     if "reminders" in db.keys():
       reminders = db["reminders"]
     await message.channel.send(reminders)
 
   # get a list of bad words
   if msg.startswith(prefix + "badwords"):
-    bad_words = []
     if "bad_words" in db.keys():
       bad_words = db["bad_words"]
     await message.channel.send(bad_words)
