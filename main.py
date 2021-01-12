@@ -7,144 +7,148 @@ from discord.ext import commands
 from replit import db
 from server import uptime_monitor
 
+import constants
+
 client = discord.Client()
-client = commands.Bot(command_prefix="mlem!")
+client = commands.Bot(command_prefix=constants.command_prefix)
+
 
 def get_quote():
-  response = requests.get("https://zenquotes.io/api/random")
-  json_data = json.loads(response.text)
-  quote = json_data[0]['q'] + " -" + json_data[0]['a']
-  return(quote)
-  
+    response = requests.get(constants.random_quotes_url)
+    json_data = json.loads(response.text)
+    quote = json_data[0]['q'] + " -" + json_data[0]['a']
+    return (quote)
+
+
+def print_list(string_list):
+    result = ""
+    for i, val in enumerate(string_list):
+        result = result + str(i) + ". " + val + ", "
+
+    return result
+
+
+def add_keyword(new_keyword):
+    db[new_keyword] = []
+
+
 # add reminder
-def update_reminder(reminder_message):
-  if "reminders" in db.keys():
-    print("db keys: ", db.keys())
-    print("reminders: ", db["reminders"])
-    reminders = db["reminders"]
-    reminders.append(reminder_message)
-    db["reminders"] = reminders
-  else:
-    db["reminders"] = [reminder_message]
+def update_warnings(warning):
+    if constants.k_warnings in db.keys():
+        warning_list = db[constants.k_warnings]
+        warning_list.append(warning)
+        db[constants.k_warnings] = warning_list
+    else:
+        db[constants.k_warnings] = [warning]
+
 
 # add bad word
 def update_badword(bad_word):
-  if "bad_words" in db.keys():
-    bad_words = db["bad_words"]
-    bad_words.append(bad_word)
-    db["bad_words"] = bad_words
-  else:
-    db["bad_words"] = [bad_word]
+    if constants.k_bad_words in db.keys():
+        bad_word_list = db[constants.k_bad_words]
+        bad_word_list.append(bad_word)
+        db[constants.k_bad_words] = bad_word_list
+    else:
+        db[constants.k_bad_words] = [bad_word]
+
 
 # delete reminder
-def delete_reminder(index):
-  reminders = db["reminders"]
-  if len(reminders) > index:
-    del reminders[index]
-  db["reminders"] = reminders
-  
+def delete_warning(index):
+    warning_list = db[constants.k_warnings]
+    if index >= 0 and index < len(warning_list):
+        del warning_list[index]
+    db[constants.k_warnings] = warning_list
+
+
 # delete bad word
 def delete_badword(index):
-  bad_words = db["bad_words"]
-  if len(bad_words) > index:
-    del bad_words[index]
-  db["bad_words"] = bad_words
+    bad_word_list = db[constants.k_bad_words]
+    if index >= 0 and index < len(bad_word_list):
+        del bad_word_list[index]
+    db[constants.k_bad_words] = bad_word_list
+
 
 @client.event
 async def on_ready():
-  print(f"We have logged in as {client.user}.")
+    print(f"We have logged in as {client.user}.")
+
 
 @client.event
 async def on_message(message):
-  msg = message.content
+    if message.author.bot:
+        return
+    msg = message.content.lower()
 
-  if msg.lower() in db.keys() and len(db[msg]) > 0:
-    await message.channel.send(random.choice(db[msg]))
-    
-  print(msg)
-  prefix = client.command_prefix
-  print('prefix: ', prefix)
-  
-  # list of available commands 
-  if msg.startswith(prefix + "help"):
-    help_list = ["add_reminder","add_badword", "del_reminder", "del_badword", "reminders", "badwords", "responding"]
-    await message.channel.send(help_list)
+    if msg in db.keys() and len(db[msg]) > 0:
+        await message.channel.send(random.choice(db[msg]))
 
-  # send quote
-  if msg.startswith(prefix + "inspire"):
-    quote = get_quote()
-    await message.channel.send(quote)
-  if msg.lower().startswith("chom") or msg.lower().startswith("chôm"):
-    # await message.channel.send(story["chom"])
-    await message.channel.send(random.choice(db["chom"]))
-  _reminders_name = "reminders"
+    prefix = client.command_prefix
 
-  # bot running with responding value = true 
-  print("reminders: ", db[_reminders_name])
-  if db["responding"]:
-    reminders = []
-    if "reminders" in db.keys():
-      reminders = db[_reminders_name]
-    
-    if not db["reminders"]:
-      print('hello im in here')
-      reminders.append("shut da fuck up")
-      db[_reminders_name] = reminders
-      
-    print(db["reminders"])
-    if any(word in msg.lower() for word in db["bad_words"]):
-      await message.channel.send(random.choice(reminders))
+    # list of available commands
+    if msg.startswith(prefix + constants.k_help):
+        await message.channel.send(constants.help_list)
 
-  # create a new reminder message
-  if msg.startswith(prefix + "add_reminder"):
-    reminder_message = msg.split("add_reminder ", 1)[1]
-    update_reminder(reminder_message)
-    await message.channel.send("You added a new reminder message!")
+    # send quote
+    if msg.startswith(prefix + constants.k_inspire):
+        quote = get_quote()
+        await message.channel.send(quote)
 
-  # create a new bad_word message
-  if msg.startswith(prefix + "add_badword"):
-    badword = msg.split("add_badword ", 1)[1]
-    update_badword(badword)
-    await message.channel.send("You added a new bad word message!")
+    # bot running with responding value = true
+    if db[constants.k_responding]:
+        if len(db[constants.k_warnings]) < 1:
+            db[constants.k_warnings] = [constants.k_default_warning]
 
-  # delete a reminder by index number
-  if msg.startswith(prefix + "del_reminder"):
-    if "reminders" in db.keys():
-      index = int(msg.split("del_reminder")[1])
-      delete_reminder(index)
-      reminders = db["reminders"]
-    await message.channel.send(reminders)
+        if any(word in msg.lower() for word in db[constants.k_bad_words]):
+            await message.channel.send(random.choice(db[constants.k_warnings]))
 
-  # delete a bad word by index number
-  if msg.startswith(prefix + "del_badword"):
-    if "bad_words" in db.keys():
-      index = int(msg.split("del_badword")[1])
-      delete_badword(index)
-      bad_words = db["bad_words"]
-    await message.channel.send(bad_words)
+    # create a new warning message
+    if msg.startswith(prefix + constants.k_add_warning):
+        warning = msg.split(constants.k_add_warning + " ", 1)[1]
+        update_warnings(warning)
+        await message.channel.send(constants.k_warning_reply)
 
-  # get a list of reminders
-  if msg.startswith(prefix + "reminders"):
-    if "reminders" in db.keys():
-      reminders = db["reminders"]
-    await message.channel.send(reminders)
+    # create a new bad word
+    if msg.startswith(prefix + constants.k_add_badword):
+        badword = msg.split(constants.k_add_badword + " ", 1)[1]
+        update_badword(badword)
+        await message.channel.send(constants.k_badword_reply)
 
-  # get a list of bad words
-  if msg.startswith(prefix + "badwords"):
-    if "bad_words" in db.keys():
-      bad_words = db["bad_words"]
-    await message.channel.send(bad_words)
+    # delete a reminder by index number
+    if msg.startswith(prefix + constants.k_del_warning):
+        index = int(msg.split(constants.k_del_warning)[1])
+        delete_warning(index)
+        warning_list = db[constants.k_warnings]
+        await message.channel.send(warning_list)
 
-  # turn the reminder feature on/off 
-  if msg.startswith(prefix + "responding"):
-    value = msg.split("responding ", 1)[1]
+    # delete a bad word by index number
+    if msg.startswith(prefix + "del_badword"):
+        if "bad_words" in db.keys():
+            index = int(msg.split("del_badword")[1])
+            delete_badword(index)
+            bad_words = db["bad_words"]
+        await message.channel.send(bad_words)
 
-    if value.lower() == "on":
-      db["responding"] = True
-      await message.channel.send("Responding is on.")
-    elif value.lower() == "off":
-      db["responding"] = False
-      await message.channel.send("Responding is off.")
+    # get a list of warnings
+    if msg == constants.command_prefix + constants.k_warnings:
+        warning_list = print_list(db[constants.k_warnings])
+        await message.channel.send(warning_list)
+
+    # get a list of bad words
+    if msg == constants.command_prefix + constants.k_bad_words:
+        badword_list = print_list(db[constants.k_bad_words])
+        await message.channel.send(badword_list)
+
+    # turn the bot on/off
+    if msg.startswith(prefix + constants.k_responding):
+        value = msg.split(constants.k_responding + " ", 1)[1]
+
+        if value.lower() == "on":
+            db[constants.k_responding] = True
+            await message.channel.send("Responding is on.")
+        elif value.lower() == "off":
+            db[constants.k_responding] = False
+            await message.channel.send("Responding is off.")
+
 
 uptime_monitor()
-client.run(os.getenv('TOKEN')) # TOKEN is stored in .env
+client.run(os.getenv('TOKEN'))  # TOKEN is stored in .env
